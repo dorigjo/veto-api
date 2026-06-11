@@ -1,0 +1,19 @@
+{
+  "name": "Valid PEPPOL BIS Billing 3.0 invoice",
+  "profile": "PEPPOL-BIS-3.0",
+  "expected_decision": "VALID",
+  "invoice": {
+    "invoice_number": "PEPPOL-INV-001",
+    "issue_date": "2024-11-15",
+    "seller": {
+      "name": "NL Supplier BV",
+      "country": "NL"
+    },
+    "buyer": {
+      "name": "DE Receiver GmbH",
+      "country": "DE"
+    },
+    "currency": "EUR",
+    "total_amount": 500.00
+  }
+}

@@ -1,23 +1,33 @@
 import type { InvoicePayload, ValidationResponse, Decision } from '../types/index.js';
-import { ENGINE_VERSION, RULE_PACK_VERSION, STORAGE_STATEMENT } from '../lib/version.js';
+import { ENGINE_VERSION, RULE_PACK_VERSION, RULE_PACK_HASH, STORAGE_STATEMENT } from '../lib/version.js';
 import { generateRequestId } from '../lib/request-id.js';
 import { isSupportedProfile } from './profiles.js';
+import { selectRulePack } from './profile-selector.js';
 import { evaluateRules } from './rules.js';
 
 export function runEngine(invoice: InvoicePayload, targetProfile: string): ValidationResponse {
   const requestId = generateRequestId();
+  const profileResolution = selectRulePack(targetProfile);
 
   if (!isSupportedProfile(targetProfile)) {
     return {
       request_id: requestId,
       decision: 'INVALID',
+      deterministic_trace: true,
       engine_version: ENGINE_VERSION,
       rule_pack_version: RULE_PACK_VERSION,
+      rule_pack_hash: RULE_PACK_HASH,
       target_profile: targetProfile,
+      profile_resolution: profileResolution,
       blocking_errors: [
         {
           rule_id: 'VT-01',
-          message: `Unsupported target profile "${targetProfile}". Supported: EN16931, PEPPOL-BIS-3.0`,
+          message: `Unsupported target profile "${targetProfile}". Supported: EN16931, PEPPOL-BIS-3.0, XRECHNUNG-3.0`,
+          severity: 'error',
+          remediation_hint: {
+            hint_type: 'unsupported_profile',
+            description: 'Set target_profile to one of: EN16931, PEPPOL-BIS-3.0, XRECHNUNG-3.0',
+          },
         },
       ],
       warnings: [],
@@ -47,9 +57,12 @@ export function runEngine(invoice: InvoicePayload, targetProfile: string): Valid
   return {
     request_id: requestId,
     decision,
+    deterministic_trace: true,
     engine_version: ENGINE_VERSION,
     rule_pack_version: RULE_PACK_VERSION,
+    rule_pack_hash: RULE_PACK_HASH,
     target_profile: targetProfile,
+    profile_resolution: profileResolution,
     blocking_errors: violations,
     warnings,
     trace,

@@ -28,9 +28,23 @@ export interface ValidateRequest {
   };
 }
 
+export type RemediationHintType =
+  | 'missing_field'
+  | 'invalid_code'
+  | 'unsupported_profile'
+  | 'transformable_gap'
+  | 'authority_profile_mismatch';
+
+export interface RemediationHint {
+  hint_type: RemediationHintType;
+  description: string;
+}
+
 export interface RuleViolation {
   rule_id: string;
   message: string;
+  severity: 'error' | 'warning';
+  remediation_hint?: RemediationHint;
 }
 
 export interface TraceEntry {
@@ -42,12 +56,24 @@ export interface TraceEntry {
 
 export type Decision = 'VALID' | 'INVALID' | 'WARNING';
 
+export interface ProfileResolution {
+  requested: string;
+  resolved: string;
+  rule_pack_id: string;
+  rule_pack_hash: string;
+  is_cius: boolean;
+  base_standard: string;
+}
+
 export interface ValidationResponse {
   request_id: string;
   decision: Decision;
+  deterministic_trace: boolean;
   engine_version: string;
   rule_pack_version: string;
+  rule_pack_hash: string;
   target_profile: string;
+  profile_resolution: ProfileResolution;
   blocking_errors: RuleViolation[];
   warnings: RuleViolation[];
   trace: TraceEntry[];

@@ -1,0 +1,19 @@
+{
+  "name": "Valid XRechnung 3.0 invoice (DE public sector)",
+  "profile": "XRECHNUNG-3.0",
+  "expected_decision": "VALID",
+  "invoice": {
+    "invoice_number": "XRECH-2024-0001",
+    "issue_date": "2024-11-15",
+    "seller": {
+      "name": "DE Lieferant GmbH",
+      "country": "DE"
+    },
+    "buyer": {
+      "name": "Bundesamt für Sicherheit",
+      "country": "DE"
+    },
+    "currency": "EUR",
+    "total_amount": 2380.00
+  }
+}

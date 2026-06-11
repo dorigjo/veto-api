@@ -1,0 +1,19 @@
+{
+  "name": "Valid EN16931 invoice",
+  "profile": "EN16931",
+  "expected_decision": "VALID",
+  "invoice": {
+    "invoice_number": "INV-2024-0001",
+    "issue_date": "2024-11-15",
+    "seller": {
+      "name": "Acme GmbH",
+      "country": "DE"
+    },
+    "buyer": {
+      "name": "Beta Corp",
+      "country": "FR"
+    },
+    "currency": "EUR",
+    "total_amount": 1190.00
+  }
+}

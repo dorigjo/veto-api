@@ -2,11 +2,15 @@ openapi: "3.1.0"
 
 info:
   title: VETO — European E-Invoicing Validation API
-  version: "0.1.0"
+  version: "0.2.0"
   description: |
-    Stateless, deterministic validation for EN 16931 and PEPPOL BIS Billing 3.0 invoices.
+    Stateless, deterministic pre-submission validation for EN 16931, PEPPOL BIS Billing 3.0, and XRechnung 3.0 invoices.
 
     No invoice data is stored or logged by this service.
+
+    **Current status:** Developer preview. Rule packs are placeholder implementations (7 rules, ~5% of EN16931).
+    Full schematron validation is in development. See the `rule_pack_hash` field — if it contains "PLACEHOLDER",
+    the rule pack has not been compiled from official artefacts.
   contact:
     email: hello@veto.dev
   license:
@@ -64,6 +68,7 @@ components:
         issue_date:
           type: string
           example: "2024-11-15"
+          description: ISO 8601 date string
         seller:
           $ref: "#/components/schemas/Seller"
         buyer:
@@ -90,7 +95,13 @@ components:
           enum:
             - EN16931
             - PEPPOL-BIS-3.0
+            - XRECHNUNG-3.0
           example: "EN16931"
+          description: |
+            Validation profile to apply.
+            - EN16931: CEN/TC 434 European semantic data model
+            - PEPPOL-BIS-3.0: OpenPEPPOL CIUS on EN16931
+            - XRECHNUNG-3.0: KoSIT German CIUS for B2G invoices
         options:
           type: object
           properties:
@@ -98,11 +109,31 @@ components:
               type: boolean
               description: Reserved for future use
 
+    RemediationHint:
+      type: object
+      required:
+        - hint_type
+        - description
+      properties:
+        hint_type:
+          type: string
+          enum:
+            - missing_field
+            - invalid_code
+            - unsupported_profile
+            - transformable_gap
+            - authority_profile_mismatch
+          example: "missing_field"
+        description:
+          type: string
+          example: 'Add field invoice_number with a non-empty string value, e.g. "INV-2024-0001"'
+
     RuleViolation:
       type: object
       required:
         - rule_id
         - message
+        - severity
       properties:
         rule_id:
           type: string
@@ -110,6 +141,14 @@ components:
         message:
           type: string
           example: "Missing or empty invoice number (invoice_number)"
+        severity:
+          type: string
+          enum:
+            - error
+            - warning
+          example: "error"
+        remediation_hint:
+          $ref: "#/components/schemas/RemediationHint"
 
     TraceEntry:
       type: object
@@ -133,14 +172,52 @@ components:
           type: string
           example: "Invoice must contain an invoice number"
 
+    ProfileResolution:
+      type: object
+      required:
+        - requested
+        - resolved
+        - rule_pack_id
+        - rule_pack_hash
+        - is_cius
+        - base_standard
+      properties:
+        requested:
+          type: string
+          example: "XRECHNUNG-3.0"
+          description: Profile identifier as provided in the request
+        resolved:
+          type: string
+          example: "XRECHNUNG-3.0"
+          description: Profile identifier after resolution
+        rule_pack_id:
+          type: string
+          example: "xrechnung-3.0-2024.1"
+          description: Unique identifier of the rule pack applied
+        rule_pack_hash:
+          type: string
+          example: "sha256-PLACEHOLDER-xrechnung-3.0-2024.1"
+          description: Cryptographic hash of the rule pack. Contains PLACEHOLDER until official artefacts are compiled.
+        is_cius:
+          type: boolean
+          example: true
+          description: Whether this profile is a CIUS (Core Invoice Usage Specification) extension of EN16931
+        base_standard:
+          type: string
+          example: "EN16931"
+          description: The base standard this profile extends
+
     ValidationResponse:
       type: object
       required:
         - request_id
         - decision
+        - deterministic_trace
         - engine_version
         - rule_pack_version
+        - rule_pack_hash
         - target_profile
+        - profile_resolution
         - blocking_errors
         - warnings
         - trace
@@ -150,33 +227,53 @@ components:
           type: string
           format: uuid
           example: "550e8400-e29b-41d4-a716-446655440000"
+          description: Unique identifier for this validation request. Contains no invoice data.
         decision:
           type: string
           enum:
             - VALID
             - INVALID
             - WARNING
+          description: |
+            - VALID: all rules passed
+            - INVALID: one or more error rules failed; do not submit
+            - WARNING: no errors, but warnings present; review before submitting
+        deterministic_trace:
+          type: boolean
+          example: true
+          description: When true, the same input will always produce the same decision and trace (except request_id)
         engine_version:
           type: string
-          example: "0.1.0"
+          example: "0.2.0"
         rule_pack_version:
           type: string
           example: "2024.1"
+        rule_pack_hash:
+          type: string
+          example: "sha256-PLACEHOLDER-2024.1-7rules"
+          description: |
+            Stable hash identifying the exact rule pack used. If this contains "PLACEHOLDER",
+            rules are not compiled from official schematron artefacts.
         target_profile:
           type: string
           example: "EN16931"
+        profile_resolution:
+          $ref: "#/components/schemas/ProfileResolution"
         blocking_errors:
           type: array
           items:
             $ref: "#/components/schemas/RuleViolation"
+          description: Rule violations with severity=error. Non-empty means decision=INVALID.
         warnings:
           type: array
           items:
             $ref: "#/components/schemas/RuleViolation"
+          description: Rule violations with severity=warning. Non-empty may mean decision=WARNING.
         trace:
           type: array
           items:
             $ref: "#/components/schemas/TraceEntry"
+          description: Complete evaluation trace — one entry per rule, regardless of pass/fail.
         storage_statement:
           type: string
           example: "No invoice data is stored or logged by this service."
@@ -204,7 +301,7 @@ components:
       properties:
         engine_version:
           type: string
-          example: "0.1.0"
+          example: "0.2.0"
         rule_pack_version:
           type: string
           example: "2024.1"
@@ -215,6 +312,7 @@ components:
           example:
             - EN16931
             - PEPPOL-BIS-3.0
+            - XRECHNUNG-3.0
 
     ErrorResponse:
       type: object
@@ -225,6 +323,10 @@ components:
           type: string
         hint:
           type: string
+        received:
+          type: string
+        max_bytes:
+          type: integer
         details:
           type: array
           items:
@@ -271,11 +373,12 @@ paths:
               schema:
                 $ref: "#/components/schemas/VersionResponse"
               example:
-                engine_version: "0.1.0"
+                engine_version: "0.2.0"
                 rule_pack_version: "2024.1"
                 supported_profiles:
                   - EN16931
                   - PEPPOL-BIS-3.0
+                  - XRECHNUNG-3.0
 
   /v1/validate:
     post:
@@ -284,10 +387,19 @@ paths:
       description: |
         Validates an invoice payload against the specified target profile.
 
-        Returns a deterministic result including the decision (VALID/INVALID/WARNING),
-        all rule violations, warnings, and a complete evaluation trace.
+        Returns a deterministic result including:
+        - `decision`: VALID / INVALID / WARNING
+        - `blocking_errors`: rule violations that prevent submission
+        - `warnings`: non-blocking issues to review
+        - `trace`: complete rule evaluation trace
+        - `profile_resolution`: which rule pack was applied and its hash
+        - `remediation_hint`: machine-actionable fix instructions per error
 
         **No invoice data is stored or logged.**
+
+        **Request size limit:** 1MB. Legitimate invoice JSON is typically under 10KB.
+
+        **Content-Type:** Must be `application/json`.
       tags:
         - Validation
       requestBody:
@@ -312,6 +424,21 @@ paths:
                     currency: "EUR"
                     total_amount: 1190.00
                   target_profile: "EN16931"
+              valid_xrechnung:
+                summary: Valid XRechnung 3.0 invoice (German B2G)
+                value:
+                  invoice:
+                    invoice_number: "XRECH-2024-001"
+                    issue_date: "2024-11-15"
+                    seller:
+                      name: "DE Lieferant GmbH"
+                      country: "DE"
+                    buyer:
+                      name: "Bundesbehörde"
+                      country: "DE"
+                    currency: "EUR"
+                    total_amount: 2380.00
+                  target_profile: "XRECHNUNG-3.0"
               invalid_missing_fields:
                 summary: Invoice with missing required fields
                 value:
@@ -320,7 +447,7 @@ paths:
                   target_profile: "EN16931"
       responses:
         "200":
-          description: Validation result
+          description: Validation result (decision may be VALID, INVALID, or WARNING)
           content:
             application/json:
               schema:
@@ -331,9 +458,18 @@ paths:
                   value:
                     request_id: "550e8400-e29b-41d4-a716-446655440000"
                     decision: VALID
-                    engine_version: "0.1.0"
+                    deterministic_trace: true
+                    engine_version: "0.2.0"
                     rule_pack_version: "2024.1"
+                    rule_pack_hash: "sha256-PLACEHOLDER-2024.1-7rules"
                     target_profile: "EN16931"
+                    profile_resolution:
+                      requested: "EN16931"
+                      resolved: "EN16931"
+                      rule_pack_id: "en16931-2024.1"
+                      rule_pack_hash: "sha256-PLACEHOLDER-en16931-2024.1"
+                      is_cius: false
+                      base_standard: "EN16931"
                     blocking_errors: []
                     warnings: []
                     trace:
@@ -343,18 +479,29 @@ paths:
                         description: "Invoice must contain an invoice number"
                     storage_statement: "No invoice data is stored or logged by this service."
                 invalid:
-                  summary: INVALID result
+                  summary: INVALID result with remediation hints
                   value:
                     request_id: "661f9511-f30c-52e5-b827-557766551111"
                     decision: INVALID
-                    engine_version: "0.1.0"
+                    deterministic_trace: true
+                    engine_version: "0.2.0"
                     rule_pack_version: "2024.1"
+                    rule_pack_hash: "sha256-PLACEHOLDER-2024.1-7rules"
                     target_profile: "EN16931"
+                    profile_resolution:
+                      requested: "EN16931"
+                      resolved: "EN16931"
+                      rule_pack_id: "en16931-2024.1"
+                      rule_pack_hash: "sha256-PLACEHOLDER-en16931-2024.1"
+                      is_cius: false
+                      base_standard: "EN16931"
                     blocking_errors:
                       - rule_id: "BR-01"
                         message: "Missing or empty invoice number (invoice_number)"
-                      - rule_id: "BR-CL-04"
-                        message: "Invalid currency format — must be ISO 4217 three-letter code, e.g. EUR (currency)"
+                        severity: "error"
+                        remediation_hint:
+                          hint_type: "missing_field"
+                          description: 'Add field invoice_number with a non-empty string value, e.g. "INV-2024-0001"'
                     warnings: []
                     trace:
                       - rule_id: "BR-01"
@@ -363,11 +510,16 @@ paths:
                         description: "Invoice must contain an invoice number"
                     storage_statement: "No invoice data is stored or logged by this service."
         "400":
-          description: Invalid request payload
+          description: Invalid request payload (bad JSON or missing required fields)
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Invalid request payload"
+                details:
+                  - path: "target_profile"
+                    message: "Required"
         "401":
           description: Missing or invalid API key
           content:
@@ -377,6 +529,24 @@ paths:
               example:
                 error: "API key required"
                 hint: "Provide X-API-Key header or Authorization: Bearer <key>"
+        "413":
+          description: Request body exceeds 1MB limit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Request body too large"
+                max_bytes: 1048576
+        "415":
+          description: Content-Type must be application/json
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "Content-Type must be application/json"
+                received: "text/plain"
 
 tags:
   - name: System

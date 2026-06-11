@@ -1,0 +1,9 @@
+{
+  "name": "Invalid — missing required fields",
+  "profile": "EN16931",
+  "expected_decision": "INVALID",
+  "expected_rule_ids": ["BR-01", "BR-02", "BR-04", "BR-07", "BR-09"],
+  "invoice": {
+    "currency": "EUR"
+  }
+}

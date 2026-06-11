@@ -1,8 +1,11 @@
 import { Hono } from 'hono';
+import { bodyLimit } from 'hono/body-limit';
 import { z } from 'zod';
 import type { AppEnv } from '../types/index.js';
 import { apiKeyMiddleware } from '../middleware/api-key.js';
 import { runEngine } from '../rules/engine.js';
+
+const MAX_BODY_BYTES = 1 * 1024 * 1024; // 1MB — invoices are small; reject oversized to prevent abuse
 
 const ValidateRequestSchema = z.object({
   invoice: z.object({
@@ -33,29 +36,46 @@ const ValidateRequestSchema = z.object({
 
 const validate = new Hono<AppEnv>();
 
-validate.post('/validate', apiKeyMiddleware, async (c) => {
-  let body: unknown;
-  try {
-    body = await c.req.json();
-  } catch {
-    return c.json({ error: 'Request body must be valid JSON' }, 400);
-  }
+validate.post(
+  '/validate',
+  bodyLimit({
+    maxSize: MAX_BODY_BYTES,
+    onError: (c) =>
+      c.json({ error: 'Request body too large', max_bytes: MAX_BODY_BYTES }, 413),
+  }),
+  apiKeyMiddleware,
+  async (c) => {
+    const contentType = c.req.header('Content-Type') ?? '';
+    if (!contentType.includes('application/json')) {
+      return c.json(
+        { error: 'Content-Type must be application/json', received: contentType || '(none)' },
+        415,
+      );
+    }
 
-  const parsed = ValidateRequestSchema.safeParse(body);
-  if (!parsed.success) {
-    return c.json(
-      {
-        error: 'Invalid request payload',
-        details: parsed.error.errors.map((e) => ({ path: e.path.join('.'), message: e.message })),
-      },
-      400,
-    );
-  }
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ error: 'Request body must be valid JSON' }, 400);
+    }
 
-  const { invoice, target_profile } = parsed.data;
-  const result = runEngine(invoice, target_profile);
+    const parsed = ValidateRequestSchema.safeParse(body);
+    if (!parsed.success) {
+      return c.json(
+        {
+          error: 'Invalid request payload',
+          details: parsed.error.errors.map((e) => ({ path: e.path.join('.'), message: e.message })),
+        },
+        400,
+      );
+    }
 
-  return c.json(result, 200);
-});
+    const { invoice, target_profile } = parsed.data;
+    const result = runEngine(invoice, target_profile);
+
+    return c.json(result, 200);
+  },
+);
 
 export { validate };

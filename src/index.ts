@@ -23,8 +23,11 @@ app.route('/v1', version);
 app.route('/v1', validate);
 
 app.notFound((c) => c.json({ error: 'Not found' }, 404));
+
+// Never log c.req or request body — invoice payloads must not appear in logs.
+// Only the Error object itself is logged; it contains no invoice data.
 app.onError((err, c) => {
-  console.error(err);
+  console.error('[veto-api] internal error:', err.message);
   return c.json({ error: 'Internal server error' }, 500);
 });
 
