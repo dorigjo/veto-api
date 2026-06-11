@@ -1,0 +1,385 @@
+openapi: "3.1.0"
+
+info:
+  title: VETO — European E-Invoicing Validation API
+  version: "0.1.0"
+  description: |
+    Stateless, deterministic validation for EN 16931 and PEPPOL BIS Billing 3.0 invoices.
+
+    No invoice data is stored or logged by this service.
+  contact:
+    email: hello@veto.dev
+  license:
+    name: MIT
+
+servers:
+  - url: https://api.veto.dev
+    description: Production
+  - url: http://localhost:8787
+    description: Local development (wrangler dev)
+
+security:
+  - ApiKeyHeader: []
+  - BearerToken: []
+
+components:
+  securitySchemes:
+    ApiKeyHeader:
+      type: apiKey
+      in: header
+      name: X-API-Key
+    BearerToken:
+      type: http
+      scheme: bearer
+
+  schemas:
+    Seller:
+      type: object
+      properties:
+        name:
+          type: string
+          example: "Acme GmbH"
+        country:
+          type: string
+          example: "DE"
+          description: ISO 3166-1 alpha-2 country code
+
+    Buyer:
+      type: object
+      properties:
+        name:
+          type: string
+          example: "Beta Corp S.A."
+        country:
+          type: string
+          example: "FR"
+          description: ISO 3166-1 alpha-2 country code
+
+    InvoicePayload:
+      type: object
+      properties:
+        invoice_number:
+          type: string
+          example: "INV-2024-0001"
+        issue_date:
+          type: string
+          example: "2024-11-15"
+        seller:
+          $ref: "#/components/schemas/Seller"
+        buyer:
+          $ref: "#/components/schemas/Buyer"
+        currency:
+          type: string
+          example: "EUR"
+          description: ISO 4217 three-letter currency code
+        total_amount:
+          type: number
+          format: double
+          example: 1190.00
+
+    ValidateRequest:
+      type: object
+      required:
+        - invoice
+        - target_profile
+      properties:
+        invoice:
+          $ref: "#/components/schemas/InvoicePayload"
+        target_profile:
+          type: string
+          enum:
+            - EN16931
+            - PEPPOL-BIS-3.0
+          example: "EN16931"
+        options:
+          type: object
+          properties:
+            strict:
+              type: boolean
+              description: Reserved for future use
+
+    RuleViolation:
+      type: object
+      required:
+        - rule_id
+        - message
+      properties:
+        rule_id:
+          type: string
+          example: "BR-01"
+        message:
+          type: string
+          example: "Missing or empty invoice number (invoice_number)"
+
+    TraceEntry:
+      type: object
+      required:
+        - rule_id
+        - passed
+        - severity
+        - description
+      properties:
+        rule_id:
+          type: string
+          example: "BR-01"
+        passed:
+          type: boolean
+        severity:
+          type: string
+          enum:
+            - error
+            - warning
+        description:
+          type: string
+          example: "Invoice must contain an invoice number"
+
+    ValidationResponse:
+      type: object
+      required:
+        - request_id
+        - decision
+        - engine_version
+        - rule_pack_version
+        - target_profile
+        - blocking_errors
+        - warnings
+        - trace
+        - storage_statement
+      properties:
+        request_id:
+          type: string
+          format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        decision:
+          type: string
+          enum:
+            - VALID
+            - INVALID
+            - WARNING
+        engine_version:
+          type: string
+          example: "0.1.0"
+        rule_pack_version:
+          type: string
+          example: "2024.1"
+        target_profile:
+          type: string
+          example: "EN16931"
+        blocking_errors:
+          type: array
+          items:
+            $ref: "#/components/schemas/RuleViolation"
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/RuleViolation"
+        trace:
+          type: array
+          items:
+            $ref: "#/components/schemas/TraceEntry"
+        storage_statement:
+          type: string
+          example: "No invoice data is stored or logged by this service."
+
+    HealthResponse:
+      type: object
+      required:
+        - status
+        - timestamp
+      properties:
+        status:
+          type: string
+          enum:
+            - ok
+        timestamp:
+          type: string
+          format: date-time
+
+    VersionResponse:
+      type: object
+      required:
+        - engine_version
+        - rule_pack_version
+        - supported_profiles
+      properties:
+        engine_version:
+          type: string
+          example: "0.1.0"
+        rule_pack_version:
+          type: string
+          example: "2024.1"
+        supported_profiles:
+          type: array
+          items:
+            type: string
+          example:
+            - EN16931
+            - PEPPOL-BIS-3.0
+
+    ErrorResponse:
+      type: object
+      required:
+        - error
+      properties:
+        error:
+          type: string
+        hint:
+          type: string
+        details:
+          type: array
+          items:
+            type: object
+            properties:
+              path:
+                type: string
+              message:
+                type: string
+
+paths:
+  /v1/health:
+    get:
+      operationId: getHealth
+      summary: Liveness check
+      description: Returns 200 if the service is running. No authentication required.
+      security: []
+      tags:
+        - System
+      responses:
+        "200":
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              example:
+                status: ok
+                timestamp: "2024-11-15T10:30:00.000Z"
+
+  /v1/version:
+    get:
+      operationId: getVersion
+      summary: Engine and rule-pack versions
+      description: Returns current engine version, rule pack version, and supported profiles. No authentication required.
+      security: []
+      tags:
+        - System
+      responses:
+        "200":
+          description: Version information
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionResponse"
+              example:
+                engine_version: "0.1.0"
+                rule_pack_version: "2024.1"
+                supported_profiles:
+                  - EN16931
+                  - PEPPOL-BIS-3.0
+
+  /v1/validate:
+    post:
+      operationId: validateInvoice
+      summary: Validate an invoice
+      description: |
+        Validates an invoice payload against the specified target profile.
+
+        Returns a deterministic result including the decision (VALID/INVALID/WARNING),
+        all rule violations, warnings, and a complete evaluation trace.
+
+        **No invoice data is stored or logged.**
+      tags:
+        - Validation
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ValidateRequest"
+            examples:
+              valid_en16931:
+                summary: Valid EN 16931 invoice
+                value:
+                  invoice:
+                    invoice_number: "INV-2024-0001"
+                    issue_date: "2024-11-15"
+                    seller:
+                      name: "Acme GmbH"
+                      country: "DE"
+                    buyer:
+                      name: "Beta Corp S.A."
+                      country: "FR"
+                    currency: "EUR"
+                    total_amount: 1190.00
+                  target_profile: "EN16931"
+              invalid_missing_fields:
+                summary: Invoice with missing required fields
+                value:
+                  invoice:
+                    currency: "EUROS"
+                  target_profile: "EN16931"
+      responses:
+        "200":
+          description: Validation result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationResponse"
+              examples:
+                valid:
+                  summary: VALID result
+                  value:
+                    request_id: "550e8400-e29b-41d4-a716-446655440000"
+                    decision: VALID
+                    engine_version: "0.1.0"
+                    rule_pack_version: "2024.1"
+                    target_profile: "EN16931"
+                    blocking_errors: []
+                    warnings: []
+                    trace:
+                      - rule_id: "BR-01"
+                        passed: true
+                        severity: error
+                        description: "Invoice must contain an invoice number"
+                    storage_statement: "No invoice data is stored or logged by this service."
+                invalid:
+                  summary: INVALID result
+                  value:
+                    request_id: "661f9511-f30c-52e5-b827-557766551111"
+                    decision: INVALID
+                    engine_version: "0.1.0"
+                    rule_pack_version: "2024.1"
+                    target_profile: "EN16931"
+                    blocking_errors:
+                      - rule_id: "BR-01"
+                        message: "Missing or empty invoice number (invoice_number)"
+                      - rule_id: "BR-CL-04"
+                        message: "Invalid currency format — must be ISO 4217 three-letter code, e.g. EUR (currency)"
+                    warnings: []
+                    trace:
+                      - rule_id: "BR-01"
+                        passed: false
+                        severity: error
+                        description: "Invoice must contain an invoice number"
+                    storage_statement: "No invoice data is stored or logged by this service."
+        "400":
+          description: Invalid request payload
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Missing or invalid API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              example:
+                error: "API key required"
+                hint: "Provide X-API-Key header or Authorization: Bearer <key>"
+
+tags:
+  - name: System
+    description: Operational endpoints (no auth required)
+  - name: Validation
+    description: Invoice validation endpoints (auth required)

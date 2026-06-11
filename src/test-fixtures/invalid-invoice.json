@@ -1,0 +1,11 @@
+{
+  "invoice": {
+    "invoice_number": "",
+    "seller": {
+      "name": "Acme GmbH"
+    },
+    "currency": "EUROS",
+    "total_amount": 1190.00
+  },
+  "target_profile": "EN16931"
+}
