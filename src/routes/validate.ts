@@ -3,6 +3,7 @@ import { bodyLimit } from 'hono/body-limit';
 import { z } from 'zod';
 import type { AppEnv } from '../types/index.js';
 import { apiKeyMiddleware } from '../middleware/api-key.js';
+import { rateLimitMiddleware } from '../middleware/rate-limit.js';
 import { runEngine } from '../rules/engine.js';
 
 const MAX_BODY_BYTES = 1 * 1024 * 1024; // 1MB — invoices are small; reject oversized to prevent abuse
@@ -43,6 +44,7 @@ validate.post(
     onError: (c) =>
       c.json({ error: 'Request body too large', max_bytes: MAX_BODY_BYTES }, 413),
   }),
+  rateLimitMiddleware,
   apiKeyMiddleware,
   async (c) => {
     const contentType = c.req.header('Content-Type') ?? '';

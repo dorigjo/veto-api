@@ -12,8 +12,10 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "openapi:check": "tsx scripts/openapi-check.ts",
+    "status:generate": "tsx scripts/generate-release-status.ts",
+    "compliance:check": "tsx scripts/compliance-check.ts",
     "ci": "npm run typecheck && npm run test && npm run build",
-    "release:check": "npm run typecheck && npm run test && npm run build && npm run openapi:check"
+    "release:check": "npm run typecheck && npm run test && npm run build && npm run openapi:check && npm run compliance:check"
   },
   "dependencies": {
     "hono": "^4.6.3",

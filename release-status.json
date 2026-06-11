@@ -1,0 +1,157 @@
+{
+  "schema_version": "1.0",
+  "generated_at": "2026-06-11T22:50:34.130Z",
+  "veto_version": "0.2.0",
+  "rule_pack_version": "2024.1",
+  "rule_pack_hash": "sha256-PLACEHOLDER-2024.1-7rules",
+  "supported_profiles": [
+    "EN16931",
+    "PEPPOL-BIS-3.0",
+    "XRECHNUNG-3.0"
+  ],
+  "readiness": {
+    "developer_preview": true,
+    "paid_beta": false,
+    "production_compliance": false,
+    "cloudflare_deploy": true,
+    "self_serve_saas": false
+  },
+  "compliance": {
+    "EN16931": {
+      "profile": "EN16931",
+      "is_placeholder": true,
+      "rules_implemented": 7,
+      "rules_required_for_full_compliance": 128,
+      "official_schematron_integrated": false,
+      "source": "CEN/TC 434 EN 16931-1:2017",
+      "official_schematron_url": "https://github.com/ConnectingEurope/eInvoicing-EN16931",
+      "blocker": "Official schematron artefacts not yet compiled. See docs/OFFICIAL_ARTEFACT_SYNC.md."
+    },
+    "PEPPOL-BIS-3.0": {
+      "profile": "PEPPOL-BIS-3.0",
+      "is_placeholder": true,
+      "rules_implemented": 7,
+      "rules_required_for_full_compliance": 150,
+      "official_schematron_integrated": false,
+      "source": "OpenPEPPOL PEPPOL BIS Billing 3.0",
+      "official_schematron_url": "https://github.com/OpenPEPPOL/peppol-bis-invoice-3",
+      "blocker": "Official schematron artefacts not yet compiled. See docs/OFFICIAL_ARTEFACT_SYNC.md."
+    },
+    "XRECHNUNG-3.0": {
+      "profile": "XRECHNUNG-3.0",
+      "is_placeholder": true,
+      "rules_implemented": 7,
+      "rules_required_for_full_compliance": 170,
+      "official_schematron_integrated": false,
+      "source": "KoSIT XRechnung 3.0 CIUS",
+      "official_schematron_url": "https://github.com/itplr-kosit/validator-configuration-xrechnung",
+      "blocker": "Official schematron artefacts not yet compiled. See docs/OFFICIAL_ARTEFACT_SYNC.md."
+    }
+  },
+  "infrastructure": {
+    "rate_limiting": {
+      "middleware_implemented": true,
+      "binding_configured": false,
+      "graceful_degradation": true,
+      "blocker": "RATE_LIMITER binding must be added to wrangler.toml and Cloudflare dashboard. See docs/RATE_LIMITING.md."
+    },
+    "api_key_provisioning": {
+      "mode": "manual",
+      "self_serve": false,
+      "kv_store_integrated": false,
+      "blocker": "Stripe + Cloudflare KV integration required for self-serve provisioning. See docs/API_KEY_PROVISIONING.md."
+    },
+    "billing": {
+      "stripe_integrated": false,
+      "metered_billing": false,
+      "blocker": "Stripe webhook handler and metered billing not implemented. See docs/BILLING_ARCHITECTURE.md."
+    },
+    "secrets": {
+      "api_keys_in_vars": true,
+      "wrangler_secret_configured": false,
+      "blocker": "VALID_API_KEYS must be migrated to wrangler secret put before production deployment. See docs/PRODUCTION_SECRETS.md."
+    }
+  },
+  "blockers": [
+    {
+      "id": "BLK-01",
+      "severity": "CRITICAL",
+      "category": "compliance",
+      "title": "EN16931 schematron not integrated",
+      "description": "Only 7 of 128+ EN16931 rules implemented. Official CEN/TC 434 schematron artefacts must be compiled.",
+      "blocks": [
+        "production_compliance",
+        "paid_beta"
+      ]
+    },
+    {
+      "id": "BLK-02",
+      "severity": "CRITICAL",
+      "category": "compliance",
+      "title": "PEPPOL BIS 3.0 schematron not integrated",
+      "description": "PEPPOL-specific rules (network IDs, GLN, routing) not implemented. Only 7 shared base rules active.",
+      "blocks": [
+        "production_compliance"
+      ]
+    },
+    {
+      "id": "BLK-03",
+      "severity": "CRITICAL",
+      "category": "compliance",
+      "title": "XRechnung 3.0 CIUS not integrated",
+      "description": "XRechnung-specific rules (Leitweg-ID, German B2G requirements) not implemented.",
+      "blocks": [
+        "production_compliance"
+      ]
+    },
+    {
+      "id": "BLK-04",
+      "severity": "HIGH",
+      "category": "infrastructure",
+      "title": "Rate limiting binding not configured",
+      "description": "RATE_LIMITER binding absent — any valid API key can make unlimited requests.",
+      "blocks": [
+        "paid_beta",
+        "self_serve_saas"
+      ]
+    },
+    {
+      "id": "BLK-05",
+      "severity": "HIGH",
+      "category": "infrastructure",
+      "title": "No metered billing",
+      "description": "No Stripe integration — cannot collect revenue or enforce usage caps.",
+      "blocks": [
+        "paid_beta",
+        "self_serve_saas"
+      ]
+    },
+    {
+      "id": "BLK-06",
+      "severity": "HIGH",
+      "category": "infrastructure",
+      "title": "Manual API key provisioning only",
+      "description": "Self-serve signup not possible — keys issued manually.",
+      "blocks": [
+        "self_serve_saas"
+      ]
+    },
+    {
+      "id": "BLK-07",
+      "severity": "MEDIUM",
+      "category": "secrets",
+      "title": "VALID_API_KEYS in wrangler.toml [vars]",
+      "description": "Dev placeholder in committed [vars]. Must use wrangler secret put before production.",
+      "blocks": [
+        "cloudflare_deploy_production_safe"
+      ]
+    }
+  ],
+  "go_no_go": {
+    "developer_preview": "GO",
+    "paid_beta": "NO_GO",
+    "production_compliance": "NO_GO",
+    "cloudflare_deploy": "CONDITIONAL_GO — set VALID_API_KEYS via wrangler secret put first",
+    "self_serve_saas": "NO_GO"
+  }
+}

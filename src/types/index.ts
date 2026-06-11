@@ -1,6 +1,14 @@
+// Cloudflare Rate Limiting API binding.
+// Optional — gracefully degraded when absent (dev mode or binding not yet configured).
+// Configure via wrangler.toml + Cloudflare dashboard. See docs/RATE_LIMITING.md.
+export interface RateLimitBinding {
+  limit(options: { key: string }): Promise<{ success: boolean }>;
+}
+
 export type AppEnv = {
   Bindings: {
     VALID_API_KEYS: string;
+    RATE_LIMITER?: RateLimitBinding;
   };
 };
 

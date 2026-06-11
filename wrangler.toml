@@ -3,8 +3,26 @@ main = "src/index.ts"
 compatibility_date = "2024-11-01"
 compatibility_flags = ["nodejs_compat"]
 
+# [vars] is committed to source control and is safe ONLY for non-secret dev defaults.
+# VALID_API_KEYS below is a local-dev placeholder — visible to anyone with repo access.
+# Before any production or staging deployment, set the real value via:
+#   wrangler secret put VALID_API_KEYS
+# See docs/PRODUCTION_SECRETS.md for the full secrets management runbook.
 [vars]
 VALID_API_KEYS = "dev-key-change-in-production"
 
 [observability]
 enabled = true
+
+# Rate Limiting — NOT YET ACTIVE
+# To enable per-API-key rate limiting:
+#   1. Create a Rate Limiting namespace in the Cloudflare dashboard
+#   2. Add the binding below (replace YOUR_NAMESPACE_ID with the actual ID)
+#   3. The middleware in src/middleware/rate-limit.ts activates automatically
+# See docs/RATE_LIMITING.md for configuration details and tuning guidance.
+#
+# [[unsafe.bindings]]
+# name = "RATE_LIMITER"
+# type = "ratelimit"
+# namespace_id = "YOUR_NAMESPACE_ID"
+# simple = { limit = 10000, period = 2592000 }

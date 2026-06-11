@@ -38,3 +38,6 @@ jobs:
 
       - name: OpenAPI check
         run: npm run openapi:check
+
+      - name: Compliance check
+        run: npm run compliance:check
